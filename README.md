@@ -1,4 +1,16 @@
-# 智能舞蹈机器人 V5
+# 智能舞蹈机器人 V5 / OpenEI Platform Line
+
+`main` 分支仍然服务于比赛稳定线。
+
+`openei-next` 分支开始承载 OpenEI Phase 1 平台化工作：
+
+- `src/openei/`：新的具身智能 runtime 内核
+- `docs/openei/`：平台架构与扩展文档
+- `examples/dance_demo/`：基于 OpenEI runtime 的替代示例应用
+
+OpenEI 当前定位为：
+
+`OpenEI = 面向机器人身体的 OpenClaw 级开源底座`
 
 这是当前唯一继续演进的主线工程，目标是交付一版适合现场演示的机器人控制系统。
 

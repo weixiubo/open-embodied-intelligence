@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openei"
+version = "0.1.0"
+description = "A speech-first embodied intelligence runtime foundation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "python-dotenv>=1.0.0",
+  "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10.0",
+  "pytest>=7.0.0",
+  "ruff>=0.6.0",
+]
+
+[project.scripts]
+openei = "openei.cli.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/openei"]
+mypy_path = "src"
+warn_unused_configs = true
+warn_return_any = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+follow_imports = "skip"
