@@ -9,6 +9,7 @@ from .config import OpenEISettings
 
 
 class IntentKind(StrEnum):
+    ANNOUNCE = "announce"
     DANCE = "dance"
     STOP = "stop"
     ACTION = "action"
@@ -114,4 +115,3 @@ class RuntimeContext:
     metadata: dict[str, Any] = field(default_factory=dict)
     state: dict[str, Any] = field(default_factory=dict)
     event_count: int = 0
-

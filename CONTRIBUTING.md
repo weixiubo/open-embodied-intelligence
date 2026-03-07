@@ -12,6 +12,7 @@ Do not merge platform refactors into `main` during the competition period.
 - keep modules cohesive and focused
 - prefer typed contracts over ad-hoc dictionaries between layers
 - avoid direct cross-layer imports that bypass runtime ports
+- keep new skill registration declarative; do not edit the runtime loop for a new skill
 - add tests for new skills, safety logic, and runtime behavior
 - prefer adapters when temporary legacy reuse is necessary
 
@@ -20,4 +21,3 @@ Do not merge platform refactors into `main` during the competition period.
 - target `openei-next` for platform work
 - include tests for the new behavior
 - describe whether the change touches perception, brain, safety, skills, control, or adapters
-

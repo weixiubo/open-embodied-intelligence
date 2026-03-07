@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from ._legacy_imports import ensure_legacy_project_root_on_path
 from ..config import TransportMode as OpenEITransportMode
 from ..contracts import ControlCommand, RuntimeContext
 from ..ports import ControlAdapter
+from ._legacy_imports import ensure_legacy_project_root_on_path
 
 
 class LegacyDanceCatalog:

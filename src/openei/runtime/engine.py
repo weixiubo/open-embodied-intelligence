@@ -6,6 +6,7 @@ from ..contracts import PerceptionEvent, RuntimeContext, SafetyAction, SkillRequ
 from ..logging import get_logger
 from ..ports import Brain, ControlAdapter, FeedbackSink, PerceptionSource, SafetyPolicy
 from ..skills.registry import SkillRegistry
+from .snapshot import RuntimeSettingsSnapshot, RuntimeSnapshot
 
 logger = get_logger("runtime")
 
@@ -106,20 +107,15 @@ class OpenEIRuntime:
     def stop(self) -> None:
         self._running = False
 
-    def inspect(self) -> dict[str, object]:
-        return {
-            "source": self.source.describe(),
-            "settings": {
-                "input_mode": self.context.settings.input_mode.value,
-                "transport": self.context.settings.transport.value,
-                "recording_mode": self.context.settings.recording_mode,
-                "confirm_dance_commands": self.context.settings.confirm_dance_commands,
-                "confirm_high_risk_only": self.context.settings.confirm_high_risk_only,
-            },
-            "skills": [descriptor["name"] for descriptor in self.skills.describe()],
-            "control": self.control.inspect(),
-            "pending_plan": self.context.pending_plan.summary if self.context.pending_plan else None,
-        }
+    def inspect(self) -> RuntimeSnapshot:
+        return RuntimeSnapshot(
+            source=self.source.describe(),
+            settings=RuntimeSettingsSnapshot.from_settings(self.context.settings),
+            skills=self.skills.describe(),
+            control=self.control.inspect(),
+            pending_plan=self.context.pending_plan.summary if self.context.pending_plan else None,
+            event_count=self.context.event_count,
+        )
 
     def _execute_plan(self, event: PerceptionEvent, plan: TaskPlan) -> RuntimeCycleResult:
         messages: list[str] = []

@@ -24,6 +24,7 @@ LIST_WORDS = ("舞蹈列表", "动作列表", "有什么舞蹈")
 STOP_WORDS = ("停止跳舞", "停止舞蹈", "不跳了")
 DANCE_WORDS = ("跳舞", "舞蹈", "跳")
 ACTION_WORDS = ("执行动作", "做动作")
+ANNOUNCE_WORDS = ("播报", "朗读", "提醒大家")
 
 _CN_BASIC = {
     "零": 0,
@@ -100,6 +101,15 @@ def extract_duration_candidates(text: str) -> list[int]:
     return deduped
 
 
+def extract_announcement_text(text: str) -> str | None:
+    normalized = normalize_speech_text(text)
+    for prefix in ANNOUNCE_WORDS:
+        if normalized.startswith(prefix):
+            payload = normalized.removeprefix(prefix).strip()
+            return payload or None
+    return None
+
+
 class SpeechCommandBrain(Brain):
     def __init__(self, dance_action_labels: Iterable[str]) -> None:
         self._dance_action_labels = [normalize_speech_text(label) for label in dance_action_labels]
@@ -124,6 +134,18 @@ class SpeechCommandBrain(Brain):
             return self._plan(IntentKind.STATUS, raw_text, normalized, "system", "status", "查看运行状态")
         if any(word in normalized for word in LIST_WORDS):
             return self._plan(IntentKind.LIST_ACTIONS, raw_text, normalized, "dance", "list_actions", "查看动作列表")
+
+        announcement = extract_announcement_text(raw_text)
+        if announcement is not None:
+            return self._plan(
+                IntentKind.ANNOUNCE,
+                raw_text,
+                normalized,
+                "announce",
+                "announce_text",
+                f"播报：{announcement}",
+                text=announcement,
+            )
 
         if matched_action and any(word in normalized for word in ACTION_WORDS):
             return self._plan(

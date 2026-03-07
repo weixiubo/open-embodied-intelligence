@@ -17,6 +17,28 @@ OpenEI Phase 1 uses a strict inward-facing architecture:
 
 The runtime orchestrator is responsible for wiring these layers together and nothing else.
 
+## Runtime Profiles And Inspect Surface
+
+Phase 1 exposes two runtime profiles:
+
+- `demo`
+  - confirmation stays enabled for high-risk dance requests
+  - startup messages and prompts are presentation-oriented
+- `dev`
+  - confirmation can be relaxed for faster iteration
+  - prompt and greeting make the environment explicit
+
+The stable inspect surface is:
+
+- `source`
+- `settings`
+- `skills`
+- `control`
+- `pending_plan`
+- `event_count`
+
+CLI consumers should prefer `openei inspect --format json`.
+
 ## Dependency Rules
 
 - `runtime` may depend on contracts, ports, skills, control, perception, brain, and safety
@@ -33,4 +55,3 @@ OpenEI Phase 1 reuses legacy capabilities through adapters only:
 - `LegacyLiveSpeechSource`
 
 This allows the new runtime to stay modular while avoiding a full hardware rewrite in the first milestone.
-

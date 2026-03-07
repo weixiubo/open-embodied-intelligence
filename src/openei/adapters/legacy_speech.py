@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from ._legacy_imports import ensure_legacy_project_root_on_path
 from ..brain.speech_command import normalize_speech_text
 from ..contracts import PerceptionEvent
 from ..ports import PerceptionSource
+from ._legacy_imports import ensure_legacy_project_root_on_path
 
 
 class LegacyLiveSpeechSource(PerceptionSource):

@@ -11,9 +11,9 @@ from ..logging import configure_logging
 from ..perception.sources import InteractiveSpeechTextSource, ScriptedSpeechSource
 from ..ports import ControlAdapter, PerceptionSource
 from ..safety.default import DefaultSafetyPolicy
-from ..skills.dance import DanceCatalog, DanceSkill
+from ..skills import build_builtin_skills
+from ..skills.dance import DanceCatalog
 from ..skills.registry import SkillRegistry
-from ..skills.system import SystemSkill
 from .engine import OpenEIRuntime
 
 
@@ -36,8 +36,12 @@ def build_runtime_bundle(
     control = _build_control(active_settings)
 
     registry = SkillRegistry()
-    registry.register(SystemSkill(control=control))
-    registry.register(DanceSkill(catalog=catalog))
+    registry.register_many(
+        build_builtin_skills(
+            dance_catalog=catalog,
+            control=control,
+        )
+    )
 
     brain = SpeechCommandBrain(dance_action_labels=catalog.action_labels())
     safety = DefaultSafetyPolicy(

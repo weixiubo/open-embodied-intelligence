@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from dotenv import load_dotenv
+
+
+class RuntimeProfile(StrEnum):
+    DEMO = "demo"
+    DEV = "dev"
 
 
 class InputMode(StrEnum):
@@ -34,6 +39,7 @@ def _get_bool(name: str, default: bool) -> bool:
 
 @dataclass(slots=True, frozen=True)
 class OpenEISettings:
+    profile: RuntimeProfile = RuntimeProfile.DEMO
     input_mode: InputMode = InputMode.TEXT
     transport: TransportMode = TransportMode.SIM
     recording_mode: str = "smart_vad"
@@ -44,15 +50,97 @@ class OpenEISettings:
     allow_chat_fallback: bool = True
 
     @classmethod
+    def default_for_profile(cls, profile: RuntimeProfile) -> OpenEISettings:
+        if profile == RuntimeProfile.DEV:
+            return cls(
+                profile=profile,
+                confirm_dance_commands=False,
+                confirm_high_risk_only=False,
+                startup_greeting="OpenEI dev runtime is ready.",
+                text_input_prompt="openei-dev> ",
+            )
+
+        return cls(
+            profile=profile,
+            confirm_dance_commands=False,
+            confirm_high_risk_only=True,
+            startup_greeting="OpenEI demo runtime is ready.",
+            text_input_prompt="openei> ",
+        )
+
+    @classmethod
     def from_env(cls) -> OpenEISettings:
         load_dotenv()
-        return cls(
-            input_mode=InputMode(_get_env("OPENEI_INPUT_MODE", InputMode.TEXT.value)),
-            transport=TransportMode(_get_env("OPENEI_TRANSPORT", TransportMode.SIM.value)),
-            recording_mode=_get_env("OPENEI_RECORDING_MODE", "smart_vad"),
-            confirm_dance_commands=_get_bool("OPENEI_CONFIRM_DANCE_COMMANDS", False),
-            confirm_high_risk_only=_get_bool("OPENEI_CONFIRM_HIGH_RISK_ONLY", True),
-            startup_greeting=_get_env("OPENEI_STARTUP_GREETING", "OpenEI runtime is ready."),
-            text_input_prompt=_get_env("OPENEI_TEXT_INPUT_PROMPT", "openei> "),
-            allow_chat_fallback=_get_bool("OPENEI_ALLOW_CHAT_FALLBACK", True),
+        profile = RuntimeProfile(_get_env("OPENEI_PROFILE", RuntimeProfile.DEMO.value))
+        defaults = cls.default_for_profile(profile)
+        return replace(
+            defaults,
+            input_mode=InputMode(_get_env("OPENEI_INPUT_MODE", defaults.input_mode.value)),
+            transport=TransportMode(_get_env("OPENEI_TRANSPORT", defaults.transport.value)),
+            recording_mode=_get_env("OPENEI_RECORDING_MODE", defaults.recording_mode),
+            confirm_dance_commands=_get_bool(
+                "OPENEI_CONFIRM_DANCE_COMMANDS",
+                defaults.confirm_dance_commands,
+            ),
+            confirm_high_risk_only=_get_bool(
+                "OPENEI_CONFIRM_HIGH_RISK_ONLY",
+                defaults.confirm_high_risk_only,
+            ),
+            startup_greeting=_get_env("OPENEI_STARTUP_GREETING", defaults.startup_greeting),
+            text_input_prompt=_get_env("OPENEI_TEXT_INPUT_PROMPT", defaults.text_input_prompt),
+            allow_chat_fallback=_get_bool(
+                "OPENEI_ALLOW_CHAT_FALLBACK",
+                defaults.allow_chat_fallback,
+            ),
+        )
+
+    def with_overrides(
+        self,
+        *,
+        profile: RuntimeProfile | None = None,
+        input_mode: InputMode | None = None,
+        transport: TransportMode | None = None,
+        recording_mode: str | None = None,
+        confirm_dance_commands: bool | None = None,
+        confirm_high_risk_only: bool | None = None,
+        startup_greeting: str | None = None,
+        text_input_prompt: str | None = None,
+        allow_chat_fallback: bool | None = None,
+    ) -> OpenEISettings:
+        active_profile = profile or self.profile
+        if active_profile != self.profile:
+            base = self.default_for_profile(active_profile)
+            base = replace(
+                base,
+                input_mode=self.input_mode,
+                transport=self.transport,
+                recording_mode=self.recording_mode,
+                allow_chat_fallback=self.allow_chat_fallback,
+            )
+        else:
+            base = self
+
+        return replace(
+            base,
+            profile=active_profile,
+            input_mode=input_mode or base.input_mode,
+            transport=transport or base.transport,
+            recording_mode=recording_mode or base.recording_mode,
+            confirm_dance_commands=(
+                base.confirm_dance_commands
+                if confirm_dance_commands is None
+                else confirm_dance_commands
+            ),
+            confirm_high_risk_only=(
+                base.confirm_high_risk_only
+                if confirm_high_risk_only is None
+                else confirm_high_risk_only
+            ),
+            startup_greeting=startup_greeting or base.startup_greeting,
+            text_input_prompt=text_input_prompt or base.text_input_prompt,
+            allow_chat_fallback=(
+                base.allow_chat_fallback
+                if allow_chat_fallback is None
+                else allow_chat_fallback
+            ),
         )

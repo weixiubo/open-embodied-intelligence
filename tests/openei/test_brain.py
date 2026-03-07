@@ -50,3 +50,20 @@ def test_brain_maps_named_action_to_dance_skill() -> None:
     assert plan.intent.kind == IntentKind.ACTION
     assert plan.steps[0].parameters["action_label"] == "挥手"
 
+
+def test_brain_maps_announcement_to_non_motion_skill() -> None:
+    brain = SpeechCommandBrain(dance_action_labels=["挥手"])
+    event = PerceptionEvent(
+        source="test",
+        modality="speech",
+        raw_text="播报OpenEI准备好了",
+        normalized_text="播报openei准备好了",
+    )
+
+    plan = brain.plan(event, RuntimeContext(settings=OpenEISettings()))
+
+    assert plan is not None
+    assert plan.intent.kind == IntentKind.ANNOUNCE
+    assert plan.intent.skill_name == "announce"
+    assert plan.steps[0].action == "announce_text"
+    assert plan.steps[0].parameters["text"] == "openei准备好了"
