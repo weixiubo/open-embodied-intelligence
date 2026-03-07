@@ -34,7 +34,7 @@ class DanceSkill(Skill):
         if action == "execute_action":
             label = str(parameters.get("action_label", ""))
             if not self.catalog.has_action(label):
-                return SkillResult(success=False, messages=(f"未找到动作 {label}。",))
+                return SkillResult(success=False, messages=(f"Unknown dance action: {label}",))
             return SkillResult(
                 success=True,
                 emitted_commands=(
@@ -67,4 +67,4 @@ class DanceSkill(Skill):
                 ),
             )
 
-        return SkillResult(success=False, messages=(f"不支持的舞蹈动作操作：{action}",))
+        return SkillResult(success=False, messages=(f"Unsupported dance action: {action}",))

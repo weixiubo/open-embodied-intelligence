@@ -22,8 +22,8 @@ class LegacyDanceCatalog:
         return self._library.get_action(label) is not None
 
     def render_action_list(self) -> str:
-        labels = "、".join(self._library.get_labels())
-        return f"当前可用动作有：{labels}"
+        labels = ", ".join(self._library.get_labels())
+        return f"Available dance actions: {labels}"
 
 
 class LegacyDanceControlAdapter(ControlAdapter):
@@ -60,7 +60,7 @@ class LegacyDanceControlAdapter(ControlAdapter):
             ok = self._controller.execute_single_action(label)
             return ok, self._controller.pop_feedback_message() or ""
 
-        return False, f"LegacyDanceControlAdapter 不支持命令 {command.command_type}"
+        return False, f"LegacyDanceControlAdapter does not support command '{command.command_type}'."
 
     def inspect(self) -> dict[str, object]:
         status = self._controller.get_status()

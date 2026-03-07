@@ -12,6 +12,11 @@ class RuntimeProfile(StrEnum):
     DEV = "dev"
 
 
+class BrainMode(StrEnum):
+    DETERMINISTIC = "deterministic"
+    LLM_ASSISTED = "llm-assisted"
+
+
 class InputMode(StrEnum):
     TEXT = "text"
     SCRIPTED = "scripted"
@@ -40,6 +45,7 @@ def _get_bool(name: str, default: bool) -> bool:
 @dataclass(slots=True, frozen=True)
 class OpenEISettings:
     profile: RuntimeProfile = RuntimeProfile.DEMO
+    brain_mode: BrainMode = BrainMode.DETERMINISTIC
     input_mode: InputMode = InputMode.TEXT
     transport: TransportMode = TransportMode.SIM
     recording_mode: str = "smart_vad"
@@ -54,6 +60,7 @@ class OpenEISettings:
         if profile == RuntimeProfile.DEV:
             return cls(
                 profile=profile,
+                brain_mode=BrainMode.DETERMINISTIC,
                 confirm_dance_commands=False,
                 confirm_high_risk_only=False,
                 startup_greeting="OpenEI dev runtime is ready.",
@@ -62,6 +69,7 @@ class OpenEISettings:
 
         return cls(
             profile=profile,
+            brain_mode=BrainMode.DETERMINISTIC,
             confirm_dance_commands=False,
             confirm_high_risk_only=True,
             startup_greeting="OpenEI demo runtime is ready.",
@@ -75,6 +83,7 @@ class OpenEISettings:
         defaults = cls.default_for_profile(profile)
         return replace(
             defaults,
+            brain_mode=BrainMode(_get_env("OPENEI_BRAIN_MODE", defaults.brain_mode.value)),
             input_mode=InputMode(_get_env("OPENEI_INPUT_MODE", defaults.input_mode.value)),
             transport=TransportMode(_get_env("OPENEI_TRANSPORT", defaults.transport.value)),
             recording_mode=_get_env("OPENEI_RECORDING_MODE", defaults.recording_mode),
@@ -98,6 +107,7 @@ class OpenEISettings:
         self,
         *,
         profile: RuntimeProfile | None = None,
+        brain_mode: BrainMode | None = None,
         input_mode: InputMode | None = None,
         transport: TransportMode | None = None,
         recording_mode: str | None = None,
@@ -112,6 +122,7 @@ class OpenEISettings:
             base = self.default_for_profile(active_profile)
             base = replace(
                 base,
+                brain_mode=self.brain_mode,
                 input_mode=self.input_mode,
                 transport=self.transport,
                 recording_mode=self.recording_mode,
@@ -123,6 +134,7 @@ class OpenEISettings:
         return replace(
             base,
             profile=active_profile,
+            brain_mode=brain_mode or base.brain_mode,
             input_mode=input_mode or base.input_mode,
             transport=transport or base.transport,
             recording_mode=recording_mode or base.recording_mode,

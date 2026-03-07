@@ -40,19 +40,19 @@ python -m pip install -e .[dev]
 Inspect the runtime:
 
 ```bash
-openei inspect --profile demo --transport sim --format json
+openei inspect --profile demo --brain deterministic --transport sim --format json
 ```
 
 Run a one-shot scripted dance command:
 
 ```bash
-openei run --profile demo --transport sim --text "跳舞十秒" --once
+openei run --profile demo --transport sim --text "dance 10 seconds" --once
 ```
 
 Run a one-shot non-motion command:
 
 ```bash
-openei run --profile demo --transport sim --text "播报OpenEI准备好了" --once
+openei run --profile demo --transport sim --text "announce OpenEI is ready" --once
 ```
 
 ## Engineering Baseline
@@ -69,3 +69,13 @@ OpenEI Phase 1 uses:
 - do not merge platform refactors into `main` during the competition period
 - all OpenEI platform work belongs on `openei-next`
 - useful fixes from `main` may be cherry-picked or merged into `openei-next`
+
+## Current Phase 1 Focus
+
+The current OpenEI milestone is not "full multi-agent robotics" yet.
+The active focus is:
+
+- close the Phase 1 runtime loop
+- harden `perception -> brain -> safety -> skill -> control`
+- keep high-risk execution decisions centralized in `safety`
+- reduce legacy coupling behind adapters

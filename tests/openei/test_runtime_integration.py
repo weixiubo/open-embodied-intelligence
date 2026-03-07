@@ -12,15 +12,16 @@ def test_runtime_runs_speech_to_confirmation_to_control_flow() -> None:
         confirm_dance_commands=False,
         confirm_high_risk_only=True,
     )
-    bundle = build_runtime_bundle(settings=settings, scripted_inputs=["跳舞50秒", "确认"])
+    bundle = build_runtime_bundle(settings=settings, scripted_inputs=["\u8df3\u821e50\u79d2", "\u786e\u8ba4"])
     sink = MemoryFeedbackSink()
     bundle.runtime.feedback = sink
 
     bundle.runtime.run(max_events=2)
 
-    assert any("请确认" in message for message in sink.messages)
-    assert any("确认执行" in message for message in sink.messages)
+    assert any("Please confirm:" in message for message in sink.messages)
+    assert any("Confirmed:" in message for message in sink.messages)
     assert bundle.runtime.control.inspect()["is_dancing"] is True
+    assert bundle.runtime.inspect().state.history_size == 2
 
 
 def test_runtime_runs_non_motion_skill_without_touching_control_loop() -> None:
@@ -28,11 +29,11 @@ def test_runtime_runs_non_motion_skill_without_touching_control_loop() -> None:
         input_mode=InputMode.SCRIPTED,
         transport=TransportMode.SIM,
     )
-    bundle = build_runtime_bundle(settings=settings, scripted_inputs=["播报OpenEI准备好了"])
+    bundle = build_runtime_bundle(settings=settings, scripted_inputs=["\u64ad\u62a5OpenEI\u51c6\u5907\u597d\u4e86"])
     sink = MemoryFeedbackSink()
     bundle.runtime.feedback = sink
 
     bundle.runtime.run(max_events=1)
 
-    assert any("播报内容：openei准备好了" in message for message in sink.messages)
+    assert any("Announcement: openei\u51c6\u5907\u597d\u4e86" in message for message in sink.messages)
     assert bundle.runtime.control.inspect()["history_size"] == 0

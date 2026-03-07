@@ -11,9 +11,9 @@ class AnnounceSkill(Skill):
     def execute(self, request: SkillRequest, context: RuntimeContext) -> SkillResult:
         text = str(request.step.parameters.get("text", "")).strip()
         if not text:
-            return SkillResult(success=False, messages=("请提供需要播报的内容。",))
+            return SkillResult(success=False, messages=("Provide text to announce.",))
         return SkillResult(
             success=True,
-            messages=(f"播报内容：{text}",),
+            messages=(f"Announcement: {text}",),
             metadata={"announced_text": text},
         )

@@ -18,25 +18,25 @@ def test_announce_skill_returns_feedback_message() -> None:
     event = PerceptionEvent(
         source="test",
         modality="speech",
-        raw_text="播报OpenEI准备好了",
-        normalized_text="播报openei准备好了",
+        raw_text="\u64ad\u62a5OpenEI\u51c6\u5907\u597d\u4e86",
+        normalized_text="\u64ad\u62a5openei\u51c6\u5907\u597d\u4e86",
     )
     intent = StructuredIntent(
         kind=IntentKind.ANNOUNCE,
         skill_name="announce",
         raw_text=event.raw_text,
         normalized_text=event.normalized_text,
-        parameters={"text": "OpenEI准备好了"},
+        parameters={"text": "OpenEI\u51c6\u5907\u597d\u4e86"},
     )
-    step = TaskStep(skill_name="announce", action="announce_text", parameters={"text": "OpenEI准备好了"})
+    step = TaskStep(skill_name="announce", action="announce_text", parameters={"text": "OpenEI\u51c6\u5907\u597d\u4e86"})
     request = SkillRequest(
         event=event,
         intent=intent,
-        plan=TaskPlan(intent=intent, steps=(step,), summary="播报：OpenEI准备好了"),
+        plan=TaskPlan(intent=intent, steps=(step,), summary="Announce OpenEI ready."),
         step=step,
     )
 
     result = skill.execute(request, RuntimeContext(settings=OpenEISettings()))
 
     assert result.success is True
-    assert result.messages == ("播报内容：OpenEI准备好了",)
+    assert result.messages == ("Announcement: OpenEI\u51c6\u5907\u597d\u4e86",)

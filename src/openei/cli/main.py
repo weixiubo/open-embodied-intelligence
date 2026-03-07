@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from ..config import InputMode, OpenEISettings, RuntimeProfile, TransportMode
+from ..config import BrainMode, InputMode, OpenEISettings, RuntimeProfile, TransportMode
 from ..runtime.builder import build_runtime_bundle
 
 
@@ -16,6 +16,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--profile",
         choices=[item.value for item in RuntimeProfile],
         default=RuntimeProfile.DEMO.value,
+    )
+    run_parser.add_argument(
+        "--brain",
+        choices=[item.value for item in BrainMode],
+        default=BrainMode.DETERMINISTIC.value,
     )
     run_parser.add_argument("--transport", choices=[item.value for item in TransportMode], default=TransportMode.SIM.value)
     run_parser.add_argument(
@@ -38,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[item.value for item in RuntimeProfile],
         default=RuntimeProfile.DEMO.value,
     )
+    inspect_parser.add_argument(
+        "--brain",
+        choices=[item.value for item in BrainMode],
+        default=BrainMode.DETERMINISTIC.value,
+    )
     inspect_parser.add_argument("--transport", choices=[item.value for item in TransportMode], default=TransportMode.SIM.value)
     inspect_parser.add_argument(
         "--input-mode",
@@ -56,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         input_mode = InputMode.SCRIPTED if args.text else InputMode(args.input_mode)
         settings = OpenEISettings.default_for_profile(RuntimeProfile(args.profile)).with_overrides(
+            brain_mode=BrainMode(args.brain),
             input_mode=input_mode,
             transport=TransportMode(args.transport),
             recording_mode=args.recording_mode,
@@ -75,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "inspect":
         settings = OpenEISettings.default_for_profile(RuntimeProfile(args.profile)).with_overrides(
+            brain_mode=BrainMode(args.brain),
             input_mode=InputMode(args.input_mode),
             transport=TransportMode(args.transport),
             recording_mode=args.recording_mode,

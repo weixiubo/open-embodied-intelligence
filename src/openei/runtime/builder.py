@@ -3,13 +3,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ..brain.speech_command import SpeechCommandBrain
-from ..config import InputMode, OpenEISettings, TransportMode
+from ..brain import DeterministicSpeechBrain, LLMAssistedSpeechBrain
+from ..config import BrainMode, InputMode, OpenEISettings, TransportMode
 from ..contracts import RuntimeContext
 from ..feedback import ConsoleFeedbackSink
 from ..logging import configure_logging
 from ..perception.sources import InteractiveSpeechTextSource, ScriptedSpeechSource
-from ..ports import ControlAdapter, PerceptionSource
+from ..ports import Brain, ControlAdapter, PerceptionSource
 from ..safety.default import DefaultSafetyPolicy
 from ..skills import build_builtin_skills
 from ..skills.dance import DanceCatalog
@@ -43,7 +43,7 @@ def build_runtime_bundle(
         )
     )
 
-    brain = SpeechCommandBrain(dance_action_labels=catalog.action_labels())
+    brain = _build_brain(active_settings, catalog)
     safety = DefaultSafetyPolicy(
         confirm_dance_commands=active_settings.confirm_dance_commands,
         confirm_high_risk_only=active_settings.confirm_high_risk_only,
@@ -60,6 +60,13 @@ def build_runtime_bundle(
         context=context,
     )
     return RuntimeBundle(settings=active_settings, runtime=runtime, skills=registry, control_name=control.name)
+
+
+def _build_brain(settings: OpenEISettings, catalog: DanceCatalog) -> Brain:
+    deterministic = DeterministicSpeechBrain(dance_action_labels=catalog.action_labels())
+    if settings.brain_mode == BrainMode.LLM_ASSISTED:
+        return LLMAssistedSpeechBrain(deterministic)
+    return deterministic
 
 
 def _build_source(settings: OpenEISettings, scripted_inputs: Sequence[str]) -> PerceptionSource:

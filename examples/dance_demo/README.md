@@ -1,23 +1,24 @@
 # OpenEI Dance Demo
 
-This example runs the legacy dance capability on top of the OpenEI runtime.
-It now also exercises a non-motion skill so the example is no longer dance-only.
+This example is the reference Phase 1 application built on top of OpenEI.
 
-## Interactive text mode
+It demonstrates:
 
-```bash
-openei run --profile demo --transport sim --input-mode text
-```
+- profile-driven runtime setup
+- deterministic vs. llm-assisted brain selection
+- simulation and legacy transport switching
+- scripted, text, and live-speech input modes
 
-## One-shot scripted mode
-
-```bash
-openei run --profile demo --transport sim --text "跳舞十秒" --once
-openei run --profile demo --transport sim --text "播报OpenEI准备好了" --once
-```
-
-## Inspect runtime
+Example commands:
 
 ```bash
-openei inspect --profile demo --transport sim --format json
+python examples/dance_demo/run.py --profile demo --transport sim
+python examples/dance_demo/run.py --profile demo --transport sim --text "dance 50 seconds" --text "confirm" --once
+python examples/dance_demo/run.py --profile demo --transport sim --text "announce OpenEI is ready" --once
+python examples/dance_demo/run.py --profile dev --brain llm-assisted --transport sim
 ```
+
+Notes:
+
+- use English example commands in repository docs to avoid Windows GBK terminal corruption
+- the deterministic brain still supports the existing Chinese speech command set at runtime

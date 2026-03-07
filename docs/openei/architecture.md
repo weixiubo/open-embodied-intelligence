@@ -17,27 +17,80 @@ OpenEI Phase 1 uses a strict inward-facing architecture:
 
 The runtime orchestrator is responsible for wiring these layers together and nothing else.
 
-## Runtime Profiles And Inspect Surface
+## Brain Modes
 
-Phase 1 exposes two runtime profiles:
+Phase 1 exposes two interchangeable brain strategies behind the same `Brain` port:
 
-- `demo`
-  - confirmation stays enabled for high-risk dance requests
-  - startup messages and prompts are presentation-oriented
-- `dev`
-  - confirmation can be relaxed for faster iteration
-  - prompt and greeting make the environment explicit
+- `deterministic`
+  - rule-driven command planning
+  - current default for all runtime profiles
+  - owns the stable speech-first command set
+- `llm-assisted`
+  - wraps the deterministic planner
+  - annotates the runtime plan with LLM-assistance metadata
+  - does not take over execution authority in Phase 1
+
+This keeps the execution boundary stable while allowing later upgrades to planning logic.
+
+## Runtime Profiles, Inputs, And Transport
+
+The runtime configuration boundary is:
+
+- `profile`
+  - `demo`
+  - `dev`
+- `brain_mode`
+  - `deterministic`
+  - `llm-assisted`
+- `input_mode`
+  - `text`
+  - `scripted`
+  - `live-speech`
+- `transport`
+  - `sim`
+  - `auto`
+  - `real`
+
+The settings object is the only supported bridge from environment variables and CLI arguments into the runtime.
+
+## Inspect Surface
 
 The stable inspect surface is:
 
 - `source`
 - `settings`
+- `state`
 - `skills`
 - `control`
 - `pending_plan`
 - `event_count`
 
 CLI consumers should prefer `openei inspect --format json`.
+
+The current `state` snapshot contains:
+
+- `session_id`
+- `history_size`
+- `last_event_text`
+- `last_intent`
+- `last_plan_summary`
+- `last_result`
+
+This is the Phase 1 compatibility surface for scripts, dashboards, and example apps.
+
+## Safety Ownership
+
+High-risk execution decisions belong to the safety layer, not to skills or control adapters.
+
+Current centralized policy responsibilities are:
+
+- confirmation and cancellation of pending plans
+- dance-duration bounds checking
+- rejecting start requests while already dancing
+- rejecting single-action execution while the robot is already dancing
+- profile-driven confirmation for high-risk dance tasks
+
+Skills may describe actions, but they must not implement their own hidden confirmation logic.
 
 ## Dependency Rules
 

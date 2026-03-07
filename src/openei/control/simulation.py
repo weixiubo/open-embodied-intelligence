@@ -25,19 +25,19 @@ class SimulationControlAdapter(ControlAdapter):
             duration = command.payload.get("duration_seconds")
             self.is_dancing = True
             self.last_action = f"dance:{duration}"
-            return True, f"[sim] 开始跳舞 {duration} 秒。"
+            return True, f"[sim] Started dance for {duration} seconds."
 
         if command.command_type == "stop_dance":
             self.is_dancing = False
             self.last_action = "stop"
-            return True, "[sim] 已停止跳舞。"
+            return True, "[sim] Stopped dance."
 
         if command.command_type == "execute_action":
             label = str(command.payload.get("action_label", ""))
             self.last_action = label
-            return True, f"[sim] 已执行动作 {label}。"
+            return True, f"[sim] Executed action {label}."
 
-        return False, f"[sim] 不支持的控制命令：{command.command_type}"
+        return False, f"[sim] Unsupported control command: {command.command_type}"
 
     def inspect(self) -> dict[str, object]:
         return {
