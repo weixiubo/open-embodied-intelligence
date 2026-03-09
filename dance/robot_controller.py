@@ -86,8 +86,22 @@ class RobotController:
 
     def _wait_for_music_ready(self, timeout_seconds: float) -> bool:
         deadline = time.time() + timeout_seconds
+        last_report_time = 0.0
+
         while not self.stop_event.is_set() and time.time() < deadline:
             features = self.music_analyzer.get_current_features()
+
+            now = time.time()
+            if now - last_report_time >= 5.0:  # 每 5 秒输出一次
+                timestamp = features.timestamp or 0.0
+                energy = features.energy or 0.0
+                time_diff = now - timestamp
+                logger.info(
+                    f"[音乐分析状态] energy={energy:.4f}, timestamp={timestamp:.3f}, "
+                    f"time_diff={time_diff:.3f}s"
+                )
+                last_report_time = now
+
             if features.timestamp and features.energy > 0.001:
                 return True
             time.sleep(0.1)
