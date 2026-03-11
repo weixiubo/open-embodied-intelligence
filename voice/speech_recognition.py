@@ -97,10 +97,12 @@ class SpeechRecognizer:
             payload = response.json()
             self.last_trace.elapsed_seconds = time.time() - started_at
 
-            if payload.get("err_no") != 0:
-                error = payload.get("err_msg", "未知错误")
+            err_no = payload.get("err_no", -1)
+            if err_no != 0:
+                err_msg = payload.get("err_msg", "未知错误")
+                error = f"[err_no={err_no}] {err_msg}"
                 self.last_trace.error = error
-                logger.warning(f"语音识别失败: {error}")
+                logger.warning("语音识别失败: %s (完整响应: %s)", error, payload)
                 return False, error
 
             text = (payload.get("result") or [""])[0].strip()

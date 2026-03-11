@@ -62,15 +62,38 @@ class VoiceRecorder:
             return self._record_push_to_talk()
         return self._record_smart_vad()
 
+    def _resolve_input_device_index(self, audio: "pyaudio.PyAudio") -> Optional[int]:
+        """按名称关键字匹配输入设备索引，优先级高于固定索引。"""
+        name_keyword = self.recording_config.input_device_name
+        if name_keyword:
+            for i in range(audio.get_device_count()):
+                info = audio.get_device_info_by_index(i)
+                if info["maxInputChannels"] > 0 and name_keyword.lower() in info["name"].lower():
+                    logger.info("按名称匹配到麦克风: index=%d name=%s", i, info["name"])
+                    return i
+            logger.warning("未找到名称含 '%s' 的输入设备，回退到索引/默认", name_keyword)
+        return self.recording_config.input_device_index
+
     def _open_stream(self):
         audio = pyaudio.PyAudio()
-        stream = audio.open(
+        open_kwargs: dict = dict(
             format=pyaudio.paInt16,
             channels=self.recording_config.channels,
             rate=self.recording_config.sample_rate,
             input=True,
             frames_per_buffer=self.recording_config.chunk_size,
         )
+        device_index = self._resolve_input_device_index(audio)
+        if device_index is not None:
+            open_kwargs["input_device_index"] = device_index
+            logger.debug(
+                "使用麦克风设备: index=%d name=%s",
+                device_index,
+                audio.get_device_info_by_index(device_index).get("name", "?"),
+            )
+        else:
+            logger.debug("使用系统默认麦克风设备")
+        stream = audio.open(**open_kwargs)
         return audio, stream
 
     def _record_fixed_duration(self, duration_seconds: float) -> Optional[RecordedAudio]:
@@ -183,6 +206,16 @@ class VoiceRecorder:
                 if index < calibration_chunks:
                     noise_window.append(volume)
                     continue
+
+                if self.vad_config.enable_debug and index % 30 == 0:
+                    dynamic_thresh_dbg = max(
+                        self.vad_config.volume_threshold,
+                        noise_window.mean() * self.vad_config.noise_multiplier if len(noise_window) else 0,
+                    )
+                    logger.debug(
+                        "VAD 音量监控: volume=%.1f threshold=%.1f started=%s",
+                        volume, dynamic_thresh_dbg, started,
+                    )
 
                 dynamic_threshold = self.vad_config.volume_threshold
                 if self.vad_config.enable_noise_adaptation and len(noise_window):

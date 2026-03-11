@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -17,6 +19,24 @@ class AudioRecordingConfig:
     max_recording_duration: float = 15.0
     calibration_seconds: float = 0.5
     pre_speech_frames: int = 4
+    # 指定麦克风设备索引（None = 系统默认）。可通过 AUDIO_INPUT_DEVICE_INDEX 环境变量覆盖。
+    # 优先级低于 AUDIO_INPUT_DEVICE_NAME（名称匹配）。
+    input_device_index: Optional[int] = field(default=None, repr=True)
+    # 按设备名称关键字匹配麦克风（推荐，不受插拔顺序影响）。
+    # 填写 arecord -l 输出中的设备名片段，如 "USB2.0" 或 "USB PnP"。
+    # 可通过 AUDIO_INPUT_DEVICE_NAME 环境变量设置。
+    input_device_name: Optional[str] = field(default=None, repr=True)
+
+    def __post_init__(self) -> None:
+        _name = os.getenv("AUDIO_INPUT_DEVICE_NAME")
+        if _name:
+            self.input_device_name = _name.strip()
+        _idx = os.getenv("AUDIO_INPUT_DEVICE_INDEX")
+        if _idx is not None:
+            try:
+                self.input_device_index = int(_idx)
+            except ValueError:
+                pass
 
 
 @dataclass
