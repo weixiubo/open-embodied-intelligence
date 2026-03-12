@@ -146,14 +146,17 @@ class TextToSpeech:
                     continue
                 command = [player, str(file_path)]
                 if player == "mpg123":
-                    command.insert(1, "-q")
+                    command[1:1] = ["-q", "-f", "12000"]
                     if out_dev:
                         command[1:1] = ["-a", out_dev]
+                elif player == "mpv":
+                    command[1:1] = ["--volume=60", "--really-quiet"]
                 elif player == "ffplay":
-                    command[1:1] = ["-nodisp", "-autoexit", "-loglevel", "quiet"]
+                    command[1:1] = ["-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", "60"]
                 elif player == "aplay":
                     if out_dev:
                         command[1:1] = ["-D", out_dev]
+                logger.info("TTS 选择播放器: %s", player)
                 subprocess.run(command, capture_output=True, check=False)
                 return
             raise RuntimeError("未找到可用播放器")

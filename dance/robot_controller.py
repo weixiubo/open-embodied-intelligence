@@ -172,7 +172,7 @@ class RobotController:
 
         music_active = self.music_analyzer.start()
         if music_active:
-            timeout = min(8.0, max(3.0, duration_seconds * 0.4))
+            timeout = min(15, max(6, duration_seconds * 0.6))
             if not self._wait_for_music_ready(timeout):
                 logger.warning("未检测到稳定音乐输入，切换到演示节拍源")
                 self._use_demo_music = True

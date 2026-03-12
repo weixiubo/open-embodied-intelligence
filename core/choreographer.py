@@ -165,7 +165,17 @@ class Choreographer:
         if not available_actions:
             logger.debug("没有可用动作（时间不足）")
             return None
-        
+
+        # 立正动作使用限制：仅允许出现在序列开头、结尾（剩余时间不足4秒）
+        # 或每隔5个动作的自然衔接节点，中间部分过滤掉
+        _is_first = len(self.action_history) == 0
+        _is_near_end = remaining_time_ms < 4000
+        _is_transition = len(self.action_history) > 0 and len(self.action_history) % 5 == 0
+        if not (_is_first or _is_near_end or _is_transition):
+            _filtered = [a for a in available_actions if a.label != "立正"]
+            if _filtered:
+                available_actions = _filtered
+
         # 计算各动作的综合得分
         scores = []
         for action in available_actions:

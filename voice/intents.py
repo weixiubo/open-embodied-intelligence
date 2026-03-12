@@ -84,7 +84,7 @@ def parse_voice_intent(
         return VoiceIntent(VoiceIntentType.ACTION, text, normalized, action_label=matched_action)
 
     if has_dance_keyword or inferred_dance:
-        duration = duration_candidates[0] if duration_candidates else 5
+        duration = duration_candidates[0] if duration_candidates else 15
         risks = []
         if len(duration_candidates) > 1:
             risks.append("multiple_durations")

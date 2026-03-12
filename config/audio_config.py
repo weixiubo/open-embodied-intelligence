@@ -28,6 +28,12 @@ class AudioRecordingConfig:
     input_device_name: Optional[str] = field(default=None, repr=True)
 
     def __post_init__(self) -> None:
+        _sr = os.getenv("AUDIO_SAMPLE_RATE")
+        if _sr is not None:
+            try:
+                self.sample_rate = int(_sr)
+            except ValueError:
+                pass
         _name = os.getenv("AUDIO_INPUT_DEVICE_NAME")
         if _name:
             self.input_device_name = _name.strip()
@@ -93,7 +99,7 @@ class VADConfig:
 @dataclass
 class MusicAnalysisConfig:
     enabled: bool = True
-    sample_rate: int = 22050
+    sample_rate: int = 16000
     chunk_size: int = 1024
     analysis_window: float = 1.2
     prewarm_timeout_seconds: float = 6.0
