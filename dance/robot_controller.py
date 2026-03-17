@@ -200,7 +200,13 @@ class RobotController:
                     remaining_time_ms=remaining_time * 1000,
                 )
                 if not result:
-                    shortest = self.action_library.get_shortest_action()
+                    non_stand_actions = [
+                        a for a in self.action_library.get_all_actions() if a.label != "立正"
+                    ]
+                    if non_stand_actions:
+                        shortest = min(non_stand_actions, key=lambda a: a.time_ms)
+                    else:
+                        shortest = self.action_library.get_shortest_action()
                     if shortest is None:
                         time.sleep(0.2)
                         continue
@@ -219,6 +225,16 @@ class RobotController:
 
                 self.serial_driver.send_action_command(action_data["seq"])
                 time.sleep(action_data["time"] / 1000)
+
+            logger.info("舞蹈主循环结束，开始强制归位立正")
+            stand_action = self.action_library.get_action("立正")
+            if stand_action:
+                last_action = self.choreographer.action_history[-1] if self.choreographer.action_history else None
+                if last_action != "立正":
+                    success = self.serial_driver.send_action_command(stand_action.seq)
+                    logger.info(f"强制归位立正发送结果: {success}")
+                else:
+                    logger.info("序列已以立正结束，无需重复归位")
         finally:
             if music_active:
                 self.music_analyzer.stop()

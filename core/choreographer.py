@@ -166,15 +166,40 @@ class Choreographer:
             logger.debug("没有可用动作（时间不足）")
             return None
 
-        # 立正动作使用限制：仅允许出现在序列开头、结尾（剩余时间不足4秒）
-        # 或每隔5个动作的自然衔接节点，中间部分过滤掉
-        _is_first = len(self.action_history) == 0
-        _is_near_end = remaining_time_ms < 4000
-        _is_transition = len(self.action_history) > 0 and len(self.action_history) % 5 == 0
-        if not (_is_first or _is_near_end or _is_transition):
+        # 每个动作之间强制插入立正过渡，防止大幅度动作直接衔接导致摔倒
+        _last = self.action_history[-1] if self.action_history else None
+        if _last and _last != "立正":
+            _stand = self.action_library.get_action("立正")
+            if _stand and _stand.time_ms <= remaining_time_ms:
+                action_data = self.action_library.get_action_data("立正")
+                self.current_action = "立正"
+                self.action_history.append("立正")
+                if len(self.action_history) > self.max_history:
+                    self.action_history.pop(0)
+                return "立正", action_data, "动作过渡衔接"
+        # 上一个已经是立正（或首个动作），正常选择时排除立正避免连续重复
+        if _last == "立正":
             _filtered = [a for a in available_actions if a.label != "立正"]
             if _filtered:
                 available_actions = _filtered
+
+        # 正常舞蹈动作选择流程中始终排除“立正”
+        _stand_filtered = [a for a in available_actions if a.label != "立正"]
+        if _stand_filtered:
+            available_actions = _stand_filtered
+        else:
+            return None
+
+        # 强烈避免连续相同动作
+        if _last:
+            _no_immediate = [a for a in available_actions if a.label != _last]
+            if _no_immediate:
+                available_actions = _no_immediate
+
+        # 尽量避免全局重复（若有未出现过的动作则优先使用）
+        _no_repeat = [a for a in available_actions if a.label not in self.action_history]
+        if _no_repeat:
+            available_actions = _no_repeat
 
         # 计算各动作的综合得分
         scores = []
