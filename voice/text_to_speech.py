@@ -116,15 +116,47 @@ class TextToSpeech:
             logger.error(f"播放语音失败: {exc}")
             return False
 
+    def _resolve_output_device(self) -> Optional[str]:
+        """优先用名称关键字自动查找 ALSA hw 地址，回退到 AUDIO_OUTPUT_DEVICE 固定值。"""
+        import os as _os
+        import subprocess as _sp
+        name_keyword = _os.getenv("AUDIO_OUTPUT_DEVICE_NAME")
+        if name_keyword:
+            try:
+                result = _sp.run(["aplay", "-l"], capture_output=True, text=True, check=False)
+                for line in result.stdout.splitlines():
+                    if name_keyword.lower() in line.lower() and line.startswith("card"):
+                        parts = line.split(":")
+                        card_num = parts[0].replace("card", "").strip()
+                        dev_num = parts[1].strip().split()[1].rstrip(",")
+                        hw_addr = f"hw:{card_num},{dev_num}"
+                        logger.info("按名称匹配到输出设备: %s -> %s", name_keyword, hw_addr)
+                        return hw_addr
+                logger.warning("未找到名称含 '%s' 的输出设备，回退到 AUDIO_OUTPUT_DEVICE", name_keyword)
+            except Exception as exc:
+                logger.warning("自动查找输出设备失败: %s", exc)
+        return _os.getenv("AUDIO_OUTPUT_DEVICE")
+
     def _play_audio(self, file_path: Path) -> None:
         system = platform.system()
         if system == "Linux":
+            out_dev = self._resolve_output_device()
             for player in ("mpg123", "mpv", "ffplay", "aplay"):
                 if not shutil.which(player):
                     continue
                 command = [player, str(file_path)]
                 if player == "mpg123":
-                    command.insert(1, "-q")
+                    command[1:1] = ["-q", "-f", "12000"]
+                    if out_dev:
+                        command[1:1] = ["-a", out_dev]
+                elif player == "mpv":
+                    command[1:1] = ["--volume=60", "--really-quiet"]
+                elif player == "ffplay":
+                    command[1:1] = ["-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", "60"]
+                elif player == "aplay":
+                    if out_dev:
+                        command[1:1] = ["-D", out_dev]
+                logger.info("TTS 选择播放器: %s", player)
                 subprocess.run(command, capture_output=True, check=False)
                 return
             raise RuntimeError("未找到可用播放器")

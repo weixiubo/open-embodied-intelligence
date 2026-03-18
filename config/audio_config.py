@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -17,6 +19,30 @@ class AudioRecordingConfig:
     max_recording_duration: float = 15.0
     calibration_seconds: float = 0.5
     pre_speech_frames: int = 4
+    # 指定麦克风设备索引（None = 系统默认）。可通过 AUDIO_INPUT_DEVICE_INDEX 环境变量覆盖。
+    # 优先级低于 AUDIO_INPUT_DEVICE_NAME（名称匹配）。
+    input_device_index: Optional[int] = field(default=None, repr=True)
+    # 按设备名称关键字匹配麦克风（推荐，不受插拔顺序影响）。
+    # 填写 arecord -l 输出中的设备名片段，如 "USB2.0" 或 "USB PnP"。
+    # 可通过 AUDIO_INPUT_DEVICE_NAME 环境变量设置。
+    input_device_name: Optional[str] = field(default=None, repr=True)
+
+    def __post_init__(self) -> None:
+        _sr = os.getenv("AUDIO_SAMPLE_RATE")
+        if _sr is not None:
+            try:
+                self.sample_rate = int(_sr)
+            except ValueError:
+                pass
+        _name = os.getenv("AUDIO_INPUT_DEVICE_NAME")
+        if _name:
+            self.input_device_name = _name.strip()
+        _idx = os.getenv("AUDIO_INPUT_DEVICE_INDEX")
+        if _idx is not None:
+            try:
+                self.input_device_index = int(_idx)
+            except ValueError:
+                pass
 
 
 @dataclass
@@ -73,7 +99,7 @@ class VADConfig:
 @dataclass
 class MusicAnalysisConfig:
     enabled: bool = True
-    sample_rate: int = 22050
+    sample_rate: int = 16000
     chunk_size: int = 1024
     analysis_window: float = 1.2
     prewarm_timeout_seconds: float = 6.0

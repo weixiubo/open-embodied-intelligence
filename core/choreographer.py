@@ -31,12 +31,15 @@ class MarkovChain:
     
     # 动作类型之间的转移概率
     TYPE_TRANSITIONS = {
-        "stand": {"forward": 0.35, "gesture": 0.25, "turn": 0.20, "side": 0.15, "stand": 0.05},
-        "forward": {"turn": 0.30, "side": 0.25, "stand": 0.20, "gesture": 0.15, "forward": 0.10},
-        "turn": {"forward": 0.35, "side": 0.25, "stand": 0.20, "gesture": 0.15, "turn": 0.05},
-        "side": {"forward": 0.30, "turn": 0.25, "stand": 0.20, "gesture": 0.15, "side": 0.10},
-        "gesture": {"forward": 0.30, "stand": 0.25, "turn": 0.20, "side": 0.15, "gesture": 0.10},
-        "combo": {"stand": 0.40, "gesture": 0.25, "forward": 0.20, "turn": 0.10, "side": 0.05},
+        "stand":   {"forward": 0.30, "gesture": 0.20, "turn": 0.15, "side": 0.10, "dance": 0.15, "left": 0.05, "right": 0.05, "stand": 0.00},
+        "forward": {"turn": 0.20, "side": 0.15, "stand": 0.15, "gesture": 0.10, "dance": 0.25, "left": 0.10, "right": 0.05, "forward": 0.00},
+        "turn":    {"forward": 0.25, "side": 0.15, "stand": 0.15, "gesture": 0.10, "dance": 0.20, "left": 0.10, "right": 0.05, "turn": 0.00},
+        "side":    {"forward": 0.20, "turn": 0.20, "stand": 0.15, "gesture": 0.10, "dance": 0.20, "left": 0.10, "right": 0.05, "side": 0.00},
+        "gesture": {"forward": 0.20, "stand": 0.15, "turn": 0.15, "side": 0.10, "dance": 0.25, "left": 0.10, "right": 0.05, "gesture": 0.00},
+        "combo":   {"stand": 0.25, "gesture": 0.20, "forward": 0.15, "turn": 0.10, "dance": 0.20, "left": 0.05, "right": 0.05, "side": 0.00},
+        "dance":   {"dance": 0.35, "gesture": 0.20, "forward": 0.15, "stand": 0.10, "left": 0.10, "right": 0.05, "turn": 0.05, "side": 0.00},
+        "left":    {"right": 0.35, "dance": 0.30, "forward": 0.15, "stand": 0.10, "gesture": 0.05, "turn": 0.05, "side": 0.00, "left": 0.00},
+        "right":   {"left": 0.35, "dance": 0.30, "forward": 0.15, "stand": 0.10, "gesture": 0.05, "turn": 0.05, "side": 0.00, "right": 0.00},
     }
     
     def __init__(self):
@@ -162,7 +165,42 @@ class Choreographer:
         if not available_actions:
             logger.debug("没有可用动作（时间不足）")
             return None
-        
+
+        # 每个动作之间强制插入立正过渡，防止大幅度动作直接衔接导致摔倒
+        _last = self.action_history[-1] if self.action_history else None
+        if _last and _last != "立正":
+            _stand = self.action_library.get_action("立正")
+            if _stand and _stand.time_ms <= remaining_time_ms:
+                action_data = self.action_library.get_action_data("立正")
+                self.current_action = "立正"
+                self.action_history.append("立正")
+                if len(self.action_history) > self.max_history:
+                    self.action_history.pop(0)
+                return "立正", action_data, "动作过渡衔接"
+        # 上一个已经是立正（或首个动作），正常选择时排除立正避免连续重复
+        if _last == "立正":
+            _filtered = [a for a in available_actions if a.label != "立正"]
+            if _filtered:
+                available_actions = _filtered
+
+        # 正常舞蹈动作选择流程中始终排除“立正”
+        _stand_filtered = [a for a in available_actions if a.label != "立正"]
+        if _stand_filtered:
+            available_actions = _stand_filtered
+        else:
+            return None
+
+        # 强烈避免连续相同动作
+        if _last:
+            _no_immediate = [a for a in available_actions if a.label != _last]
+            if _no_immediate:
+                available_actions = _no_immediate
+
+        # 尽量避免全局重复（若有未出现过的动作则优先使用）
+        _no_repeat = [a for a in available_actions if a.label not in self.action_history]
+        if _no_repeat:
+            available_actions = _no_repeat
+
         # 计算各动作的综合得分
         scores = []
         for action in available_actions:
@@ -268,7 +306,7 @@ class Choreographer:
     def _score_mood_match(self, action, music_features: MusicFeatures) -> float:
         """情绪匹配评分"""
         if music_features.mood == "energetic":
-            return 1.0 if hasattr(action, 'type') and action.type in ["forward", "combo"] else 0.5
+            return 1.0 if hasattr(action, 'type') and action.type in ["forward", "combo", "dance", "left", "right"] else 0.5
         elif music_features.mood == "calm":
             return 1.0 if hasattr(action, 'type') and action.type in ["stand", "gesture"] else 0.5
         return 0.7
@@ -285,9 +323,9 @@ class Choreographer:
         # 不同段落偏好不同类型的动作
         preferences = {
             "intro": ["stand", "gesture"],
-            "verse": ["forward", "side"],
-            "chorus": ["combo", "forward"],
-            "bridge": ["turn", "side"],
+            "verse": ["forward", "side", "left", "right"],
+            "chorus": ["combo", "forward", "dance"],
+            "bridge": ["turn", "side", "left", "right", "dance"],
             "outro": ["stand", "gesture"],
         }
         
@@ -386,6 +424,9 @@ class Choreographer:
                 "side": "侧移动作",
                 "gesture": "手势动作",
                 "combo": "组合动作",
+                "dance": "舞蹈动作",
+                "left": "左移动作",
+                "right": "右移动作",
             }
             reasons.append(type_names.get(action.type, action.type))
         

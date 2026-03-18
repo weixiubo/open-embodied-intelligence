@@ -40,6 +40,7 @@ class VoiceRecorder:
         self.recording_config = audio_config.recording
         self.vad_config = audio_config.vad
         self.paused = False
+        self._actual_sample_rate = self.recording_config.sample_rate  # 存储实际采样率
 
     @property
     def is_available(self) -> bool:
@@ -62,22 +63,97 @@ class VoiceRecorder:
             return self._record_push_to_talk()
         return self._record_smart_vad()
 
+    def _resolve_input_device_index(self, audio: "pyaudio.PyAudio") -> Optional[int]:
+        """按名称关键字匹配输入设备索引，优先级高于固定索引。"""
+        logger.info("=== 系统可用输入设备列表 ===")
+        for i in range(audio.get_device_count()):
+            info = audio.get_device_info_by_index(i)
+            if info.get("maxInputChannels", 0) > 0:
+                logger.info("[检测] Index: %d, Name: %s", i, info.get("name", ""))
+        logger.info("============================")
+
+        name_keyword = self.recording_config.input_device_name
+        if name_keyword:
+            for i in range(audio.get_device_count()):
+                info = audio.get_device_info_by_index(i)
+                name = info.get("name", "")
+                name_lower = name.lower()
+                if "usb2.0 device" in name_lower:
+                    logger.debug("忽略外接输出设备: %s", name)
+                    continue
+                if info["maxInputChannels"] > 0 and name_keyword.lower() in name_lower:
+                    logger.info("按名称匹配到真实麦克风(咪头): index=%d name=%s", i, info["name"])
+                    return i
+            logger.warning("未找到名称含 '%s' 的输入设备，回退到索引/默认", name_keyword)
+        return self.recording_config.input_device_index
+
     def _open_stream(self):
+        import os
+        os.environ["PA_ALSA_PLUGHW"] = "1"  # 强制启用 ALSA plughw 插件，底层自动处理 48k 到 16k 的重采样
+        
         audio = pyaudio.PyAudio()
-        stream = audio.open(
+        open_kwargs: dict = dict(
             format=pyaudio.paInt16,
             channels=self.recording_config.channels,
             rate=self.recording_config.sample_rate,
             input=True,
-            frames_per_buffer=self.recording_config.chunk_size,
+            # frames_per_buffer=self.recording_config.chunk_size,  # 已删除：让 PortAudio 动态适配缓冲区大小，解除 ALSA 死锁
         )
-        return audio, stream
+        device_index = self._resolve_input_device_index(audio)
+        if device_index is not None:
+            open_kwargs["input_device_index"] = device_index
+            logger.debug(
+                "使用麦克风设备: index=%d name=%s",
+                device_index,
+                audio.get_device_info_by_index(device_index).get("name", "?"),
+            )
+        else:
+            logger.debug("使用系统默认麦克风设备")
+        
+        # 尝试以配置的采样率打开设备，若失败则尝试常见采样率
+        try:
+            stream = audio.open(**open_kwargs)
+            logger.info("成功以采样率 %d Hz 打开音频设备", open_kwargs["rate"])
+            self._actual_sample_rate = open_kwargs["rate"]
+            return audio, stream
+        except OSError as e:
+            if "sample rate" in str(e).lower():
+                logger.warning(
+                    "采样率 %d Hz 不支持: %s，尝试回退到 48000 Hz",
+                    open_kwargs["rate"],
+                    e,
+                )
+                # 回退尝试：48000 Hz
+                open_kwargs["rate"] = 48000
+                try:
+                    stream = audio.open(**open_kwargs)
+                    logger.info("回退采样率至 48000 Hz 成功，系统将自动处理重采样")
+                    self._actual_sample_rate = 48000
+                    return audio, stream
+                except OSError as retry_err:
+                    logger.warning("48000 Hz 也失败: %s，尝试 44100 Hz", retry_err)
+                    # 再尝试：44100 Hz
+                    open_kwargs["rate"] = 44100
+                    try:
+                        stream = audio.open(**open_kwargs)
+                        logger.info("回退采样率至 44100 Hz 成功")
+                        self._actual_sample_rate = 44100
+                        return audio, stream
+                    except OSError:
+                        logger.error("所有采样率都失败，使用系统默认设备回退")
+                        open_kwargs.pop("input_device_index", None)
+                        open_kwargs["rate"] = self.recording_config.sample_rate
+                        stream = audio.open(**open_kwargs)
+                        self._actual_sample_rate = self.recording_config.sample_rate
+                        return audio, stream
+            else:
+                raise
 
     def _record_fixed_duration(self, duration_seconds: float) -> Optional[RecordedAudio]:
         audio, stream = self._open_stream()
         frames = []
         chunks = int(
-            self.recording_config.sample_rate / self.recording_config.chunk_size * duration_seconds
+            self._actual_sample_rate / self.recording_config.chunk_size * duration_seconds
         )
         try:
             for _ in range(chunks):
@@ -93,7 +169,7 @@ class VoiceRecorder:
         payload = b"".join(frames)
         return RecordedAudio(
             payload=payload,
-            sample_rate=self.recording_config.sample_rate,
+            sample_rate=self._actual_sample_rate,
             duration_seconds=duration_seconds,
             mode=RecordingMode.FIXED_DURATION,
         )
@@ -138,7 +214,7 @@ class VoiceRecorder:
             return None
         return RecordedAudio(
             payload=b"".join(frames),
-            sample_rate=self.recording_config.sample_rate,
+            sample_rate=self._actual_sample_rate,
             duration_seconds=duration,
             mode=RecordingMode.PUSH_TO_TALK,
         )
@@ -157,7 +233,7 @@ class VoiceRecorder:
         calibration_chunks = max(
             1,
             int(
-                self.recording_config.sample_rate
+                self._actual_sample_rate
                 / self.recording_config.chunk_size
                 * self.recording_config.calibration_seconds
             ),
@@ -166,7 +242,7 @@ class VoiceRecorder:
         try:
             for index in range(
                 int(
-                    self.recording_config.sample_rate
+                    self._actual_sample_rate
                     / self.recording_config.chunk_size
                     * self.recording_config.max_recording_duration
                 )
@@ -183,6 +259,16 @@ class VoiceRecorder:
                 if index < calibration_chunks:
                     noise_window.append(volume)
                     continue
+
+                if self.vad_config.enable_debug and index % 30 == 0:
+                    dynamic_thresh_dbg = max(
+                        self.vad_config.volume_threshold,
+                        noise_window.mean() * self.vad_config.noise_multiplier if len(noise_window) else 0,
+                    )
+                    logger.debug(
+                        "VAD 音量监控: volume=%.1f threshold=%.1f started=%s",
+                        volume, dynamic_thresh_dbg, started,
+                    )
 
                 dynamic_threshold = self.vad_config.volume_threshold
                 if self.vad_config.enable_noise_adaptation and len(noise_window):
@@ -238,7 +324,7 @@ class VoiceRecorder:
 
         return RecordedAudio(
             payload=b"".join(frames),
-            sample_rate=self.recording_config.sample_rate,
+            sample_rate=self._actual_sample_rate,
             duration_seconds=duration,
             mode=RecordingMode.SMART_VAD,
         )

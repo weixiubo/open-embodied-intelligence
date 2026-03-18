@@ -123,9 +123,9 @@ class MusicAnalyzer:
         self.stream = None
 
         # 降低环境噪音误触发，同时缩短首次有效输入等待。
-        self.noise_threshold = 250
+        self.noise_threshold = 5
         self.valid_signal_count = 0
-        self.required_valid_frames = 2
+        self.required_valid_frames = 1
         
         if not self.enabled:
             logger.warning("音乐分析功能已禁用")
@@ -135,7 +135,29 @@ class MusicAnalyzer:
     def set_feature_callback(self, callback: Callable[[MusicFeatures], None]) -> None:
         """设置特征更新回调函数"""
         self.feature_callback = callback
-    
+
+    def _resolve_input_device_index(self, audio: "pyaudio.PyAudio") -> Optional[int]:
+        """按名称关键字匹配音乐分析用输入设备，支持 AUDIO_INPUT_DEVICE_NAME 环境变量。"""
+        import os
+        name_keyword = os.getenv("AUDIO_INPUT_DEVICE_NAME")
+        if name_keyword:
+            for i in range(audio.get_device_count()):
+                info = audio.get_device_info_by_index(i)
+                name = info.get("name", "")
+                if "usb2.0 device" in name.lower():
+                    continue
+                if info.get("maxInputChannels", 0) > 0 and name_keyword.lower() in name.lower():
+                    logger.info("音乐分析按名称匹配到输入设备: index=%d name=%s", i, name)
+                    return i
+            logger.warning("未找到名称含 '%s' 的输入设备，将使用系统默认", name_keyword)
+        idx = os.getenv("AUDIO_INPUT_DEVICE_INDEX")
+        if idx is not None:
+            try:
+                return int(idx)
+            except ValueError:
+                pass
+        return None
+
     def start(self) -> bool:
         """开始音乐分析"""
         if not self.enabled:
@@ -150,12 +172,17 @@ class MusicAnalyzer:
             logger.error("pyaudio 不可用，无法进行音乐分析")
             return False
         
+        # 重置特征状态，防止旧数据欺骗 _wait_for_music_ready
+        self.current_features = MusicFeatures()
+        self.features_history.clear()
+
         try:
             # 初始化音频设备
             self.audio = pyaudio.PyAudio()
-            
-            # 创建音频流
-            self.stream = self.audio.open(
+
+            # 按名称匹配 USB 麦克风设备索引
+            device_index = self._resolve_input_device_index(self.audio)
+            open_kwargs = dict(
                 format=pyaudio.paFloat32,
                 channels=1,
                 rate=self.sample_rate,
@@ -163,6 +190,18 @@ class MusicAnalyzer:
                 frames_per_buffer=self.chunk_size,
                 stream_callback=self._audio_callback,
             )
+            if device_index is not None:
+                open_kwargs["input_device_index"] = device_index
+                logger.info(
+                    "音乐分析使用设备: index=%d name=%s",
+                    device_index,
+                    self.audio.get_device_info_by_index(device_index).get("name", "?"),
+                )
+            else:
+                logger.debug("音乐分析使用系统默认输入设备")
+
+            # 创建音频流
+            self.stream = self.audio.open(**open_kwargs)
             
             # 启动分析线程
             self.is_analyzing = True
@@ -314,11 +353,17 @@ class MusicAnalyzer:
     def _extract_features(self, audio_data: np.ndarray) -> MusicFeatures:
         """提取音乐特征"""
         features = MusicFeatures()
-        features.timestamp = time.time()
-        
+
+        # 数据不足 0.5 秒时，直接返回空特征，不更新 timestamp
+        min_required_length = int(self.sample_rate * 0.5)
+        if len(audio_data) < min_required_length:
+            return features
+
         try:
-            # 基础特征
-            features.energy = float(np.mean(audio_data ** 2))
+            # 使用 RMS 计算 energy，确保量级与外部阈值（0.001）匹配
+            raw_energy = float(np.sqrt(np.mean(audio_data ** 2)))
+            features.energy = raw_energy if np.isfinite(raw_energy) else 0.0
+
             features.zero_crossing_rate = float(
                 np.mean(librosa.feature.zero_crossing_rate(audio_data)[0])
             )
@@ -364,11 +409,14 @@ class MusicAnalyzer:
         except Exception as e:
             logger.warning(f"特征提取错误: {e}")
             features.tempo = 120.0
-            features.energy = 0.1
+            features.energy = 0.0
             features.rhythm_pattern = "steady"
             features.mood = "neutral"
             features.confidence = 0.3
-        
+            return features
+
+        # 所有计算完成后再打 timestamp，避免 librosa 耗时导致时间戳过期
+        features.timestamp = time.time()
         return features
     
     def _analyze_rhythm_pattern(self, features: MusicFeatures) -> str:

@@ -15,11 +15,13 @@ def _env(name: str, default: str) -> str:
 
 @dataclass
 class ServoConfig:
-    serial_port: str = "/dev/ttyUSB0"
+    # 香橙派 AI Pro 物理引脚 36 (UTXD2) / 11 (URXD2) 对应硬件 UART2 → /dev/ttyAMA1
+    serial_port: str = "/dev/ttyAMA1"
     baudrate: int = 115200
     auto_detect: bool = True
     required: bool = False
     common_ports: tuple[str, ...] = (
+        "/dev/ttyAMA1",  # 香橙派 AI Pro GPIO UART2（物理引脚 36/11）
         "/dev/ttyUSB0",
         "/dev/ttyUSB1",
         "/dev/ttyUSB2",

@@ -86,8 +86,22 @@ class RobotController:
 
     def _wait_for_music_ready(self, timeout_seconds: float) -> bool:
         deadline = time.time() + timeout_seconds
+        last_report_time = 0.0
+
         while not self.stop_event.is_set() and time.time() < deadline:
             features = self.music_analyzer.get_current_features()
+
+            now = time.time()
+            if now - last_report_time >= 5.0:  # 每 5 秒输出一次
+                timestamp = features.timestamp or 0.0
+                energy = features.energy or 0.0
+                time_diff = now - timestamp
+                logger.info(
+                    f"[音乐分析状态] energy={energy:.4f}, timestamp={timestamp:.3f}, "
+                    f"time_diff={time_diff:.3f}s"
+                )
+                last_report_time = now
+
             if features.timestamp and features.energy > 0.001:
                 return True
             time.sleep(0.1)
@@ -158,7 +172,7 @@ class RobotController:
 
         music_active = self.music_analyzer.start()
         if music_active:
-            timeout = min(8.0, max(3.0, duration_seconds * 0.4))
+            timeout = min(15, max(6, duration_seconds * 0.6))
             if not self._wait_for_music_ready(timeout):
                 logger.warning("未检测到稳定音乐输入，切换到演示节拍源")
                 self._use_demo_music = True
@@ -186,7 +200,13 @@ class RobotController:
                     remaining_time_ms=remaining_time * 1000,
                 )
                 if not result:
-                    shortest = self.action_library.get_shortest_action()
+                    non_stand_actions = [
+                        a for a in self.action_library.get_all_actions() if a.label != "立正"
+                    ]
+                    if non_stand_actions:
+                        shortest = min(non_stand_actions, key=lambda a: a.time_ms)
+                    else:
+                        shortest = self.action_library.get_shortest_action()
                     if shortest is None:
                         time.sleep(0.2)
                         continue
@@ -205,6 +225,16 @@ class RobotController:
 
                 self.serial_driver.send_action_command(action_data["seq"])
                 time.sleep(action_data["time"] / 1000)
+
+            logger.info("舞蹈主循环结束，开始强制归位立正")
+            stand_action = self.action_library.get_action("立正")
+            if stand_action:
+                last_action = self.choreographer.action_history[-1] if self.choreographer.action_history else None
+                if last_action != "立正":
+                    success = self.serial_driver.send_action_command(stand_action.seq)
+                    logger.info(f"强制归位立正发送结果: {success}")
+                else:
+                    logger.info("序列已以立正结束，无需重复归位")
         finally:
             if music_active:
                 self.music_analyzer.stop()

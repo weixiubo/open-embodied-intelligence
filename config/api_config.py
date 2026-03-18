@@ -51,7 +51,7 @@ class BaiduSpeechConfig:
     token_url: str = "https://aip.baidubce.com/oauth/2.0/token"
     asr_url: str = "https://vop.baidu.com/server_api"
     tts_url: str = "https://tsn.baidu.com/text2audio"
-    tts_default_volume: int = 8
+    tts_default_volume: int = 2
     tts_default_voice: int = 5
     tts_timeout: float = 60.0
     asr_timeout: int = 30
